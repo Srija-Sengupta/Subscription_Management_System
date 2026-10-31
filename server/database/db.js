@@ -49,10 +49,11 @@ db.exec(`
     end_date TEXT,
     status TEXT NOT NULL DEFAULT 'Draft',
     notes TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,next_billing_date TEXT,
     FOREIGN KEY (customer_id) REFERENCES users(id),
     FOREIGN KEY (plan_id) REFERENCES plans(id)
   );
+  
 
   CREATE TABLE IF NOT EXISTS invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
