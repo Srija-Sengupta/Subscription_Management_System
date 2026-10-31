@@ -6,7 +6,8 @@ const AUTH_API = "http://localhost:5000/api/auth";
 const PRODUCT_API = "http://localhost:5000/api/products";
 const SUBSCRIPTION_API = "http://localhost:5000/api/subscriptions";
 const INVOICE_API = "http://localhost:5000/api/invoices";
-
+const PAYMENT_API = "http://localhost:5000/api/payments";
+const DISCOUNT_API = "http://localhost:5000/api/discounts";
 
 function App() {
   const [page, setPage] = useState("login");
@@ -48,6 +49,24 @@ function App() {
     due_date: "",
     tax_rate: "0",
   });
+  const [paymentForm, setPaymentForm] = useState({
+  invoice_id: "",
+  amount: "",
+  payment_method: "UPI",
+  notes: "",
+});
+const [discounts, setDiscounts] = useState([]);
+
+const [discountForm, setDiscountForm] = useState({
+  name: "",
+  discount_type: "percentage",
+  discount_value: "",
+  plan_id: "",
+});
+
+const [discountMessage, setDiscountMessage] = useState("");
+
+const [payments, setPayments] = useState([]);
   
 
   const [products, setProducts] = useState([]);
@@ -61,13 +80,13 @@ function App() {
   const [planMessage, setPlanMessage] = useState("");
   const [subscriptionMessage, setSubscriptionMessage] = useState("");
   const [invoiceMessage, setInvoiceMessage] = useState("");
-
+  const [paymentMessage, setPaymentMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [productsLoading, setProductsLoading] = useState(false);
   const [plansLoading, setPlansLoading] = useState(false);
   const [subscriptionsLoading, setSubscriptionsLoading] = useState(false);
   const [invoiceLoading, setInvoiceLoading] = useState(false);
-
+const [paymentLoading, setPaymentLoading] = useState(false);
   const token = localStorage.getItem("token");
 
   function authHeaders() {
@@ -110,6 +129,82 @@ function App() {
       [e.target.name]: e.target.value,
     });
   }
+  // Load discount rules
+async function fetchDiscounts() {
+  if (!["admin", "staff"].includes(user?.role)) return;
+
+  try {
+    const response = await axios.get(DISCOUNT_API, {
+      headers: authHeaders(),
+    });
+
+    setDiscounts(Array.isArray(response.data) ? response.data : []);
+  } catch (error) {
+    setDiscountMessage(
+      error.response?.data?.message || "Unable to load discounts."
+    );
+  }
+}
+
+// Create discount rule
+async function handleCreateDiscount(e) {
+  e.preventDefault();
+  setDiscountMessage("");
+
+  try {
+    await axios.post(
+      DISCOUNT_API,
+      {
+        name: discountForm.name.trim(),
+        discount_type: discountForm.discount_type,
+        discount_value: Number(discountForm.discount_value),
+        plan_id: discountForm.plan_id || null,
+      },
+      {
+        headers: authHeaders(),
+      }
+    );
+
+    setDiscountMessage("Discount created successfully.");
+
+    setDiscountForm({
+      name: "",
+      discount_type: "percentage",
+      discount_value: "",
+      plan_id: "",
+    });
+
+    await fetchDiscounts();
+  } catch (error) {
+    setDiscountMessage(
+      error.response?.data?.message || "Unable to create discount."
+    );
+  }
+}
+
+// Activate or deactivate a discount
+async function handleDiscountStatusChange(discountId, status) {
+  setDiscountMessage("");
+
+  try {
+    await axios.patch(
+      `${DISCOUNT_API}/${discountId}/status`,
+      { status },
+      {
+        headers: authHeaders(),
+      }
+    );
+
+    setDiscountMessage("Discount status updated.");
+
+    await fetchDiscounts();
+  } catch (error) {
+    setDiscountMessage(
+      error.response?.data?.message ||
+        "Unable to update discount status."
+    );
+  }
+}
  
 async function handleRecordPayment(e) {
   e.preventDefault();
@@ -276,6 +371,31 @@ async function handleRecordPayment(e) {
       setInvoiceLoading(false);
     }
   }
+    // Load payments
+  async function fetchPayments() {
+    const savedToken = localStorage.getItem("token");
+    if (!savedToken) return;
+
+    setPaymentLoading(true);
+    setPaymentMessage("");
+
+    try {
+      const response = await axios.get(PAYMENT_API, {
+        headers: authHeaders(),
+      });
+
+      const data = response.data;
+      setPayments(Array.isArray(data) ? data : data.payments || []);
+    } catch (error) {
+      setPaymentMessage(
+        error.response?.data?.error ||
+          error.response?.data?.message ||
+          "Unable to load payments."
+      );
+    } finally {
+      setPaymentLoading(false);
+    }
+  }
 
   // Load dashboard data after login
   useEffect(() => {
@@ -283,7 +403,8 @@ async function handleRecordPayment(e) {
 
     fetchSubscriptions();
     fetchInvoices();
-    
+    fetchPayments();
+    fetchDiscounts();
 
     if (user.role === "admin") {
       fetchProducts();
@@ -1040,6 +1161,147 @@ async function handleRecordPayment(e) {
             </div>
           )}
         </section>
+        {/* DISCOUNT MANAGEMENT */}
+{["admin", "staff"].includes(user.role) && (
+  <section className="role-card">
+    <h2>Discount Management</h2>
+
+    <h3>Create Discount Rule</h3>
+
+    <form onSubmit={handleCreateDiscount}>
+      <input
+        name="name"
+        placeholder="Discount name"
+        value={discountForm.name}
+        onChange={(e) =>
+          setDiscountForm({
+            ...discountForm,
+            name: e.target.value,
+          })
+        }
+        required
+      />
+
+      <label>Discount type</label>
+
+      <select
+        value={discountForm.discount_type}
+        onChange={(e) =>
+          setDiscountForm({
+            ...discountForm,
+            discount_type: e.target.value,
+          })
+        }
+      >
+        <option value="percentage">Percentage (%)</option>
+        <option value="fixed">Fixed amount (₹)</option>
+      </select>
+
+      <input
+        type="number"
+        min="0.01"
+        max={
+          discountForm.discount_type === "percentage"
+            ? "100"
+            : undefined
+        }
+        step="0.01"
+        name="discount_value"
+        placeholder={
+          discountForm.discount_type === "percentage"
+            ? "Percentage value"
+            : "Amount in ₹"
+        }
+        value={discountForm.discount_value}
+        onChange={(e) =>
+          setDiscountForm({
+            ...discountForm,
+            discount_value: e.target.value,
+          })
+        }
+        required
+      />
+
+      <label>Apply to plan (optional)</label>
+
+      <select
+        value={discountForm.plan_id}
+        onChange={(e) =>
+          setDiscountForm({
+            ...discountForm,
+            plan_id: e.target.value,
+          })
+        }
+      >
+        <option value="">All plans</option>
+
+        {plans.map((plan) => (
+          <option key={plan.id} value={plan.id}>
+            {plan.name} — ₹{Number(plan.price || 0).toFixed(2)}
+          </option>
+        ))}
+      </select>
+
+      <button type="submit">Create Discount</button>
+    </form>
+
+    {discountMessage && (
+      <p className="message">{discountMessage}</p>
+    )}
+
+    <h3>Existing Discounts</h3>
+
+    {discounts.length === 0 ? (
+      <p>No discount rules created yet.</p>
+    ) : (
+      discounts.map((discount) => (
+        <div
+          key={discount.id}
+          style={{
+            border: "1px solid #ddd",
+            borderRadius: "8px",
+            padding: "12px",
+            marginBottom: "10px",
+          }}
+        >
+          <h4>{discount.name}</h4>
+
+          <p>
+            Value:{" "}
+            {discount.discount_type === "percentage"
+              ? `${discount.discount_value}%`
+              : `₹${Number(discount.discount_value).toFixed(2)}`}
+          </p>
+
+          <p>
+            Plan:{" "}
+            {discount.plan_name ||
+              (discount.plan_id
+                ? `Plan #${discount.plan_id}`
+                : "All plans")}
+          </p>
+
+          <p>Status: {discount.status || "active"}</p>
+
+          <label>Update status</label>
+
+          <select
+            value={discount.status || "active"}
+            onChange={(e) =>
+              handleDiscountStatusChange(
+                discount.id,
+                e.target.value
+              )
+            }
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      ))
+    )}
+  </section>
+)}
 
         {/* INVOICE MANAGEMENT */}
         <section className="role-card">
@@ -1175,10 +1437,10 @@ async function handleRecordPayment(e) {
                   </p>
 
                   <p>
-                    <strong>
-                      Total: ₹{Number(invoice.total_amount ?? 0).toFixed(2)}
-                    </strong>
-                  </p>
+  <strong>
+    Invoice Total: ₹{Number(invoice.amount ?? 0).toFixed(2)}
+  </strong>
+</p>
 
                   <p>Status: {invoice.status || "Draft"}</p>
 
@@ -1200,6 +1462,147 @@ async function handleRecordPayment(e) {
                         <option value="Paid">Paid</option>
                       </select>
                     </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+                {/* PAYMENT MANAGEMENT */}
+        <section className="role-card">
+          <h2>Payment Management</h2>
+
+          {["admin", "staff"].includes(user.role) && (
+            <>
+              <h3>Record Payment</h3>
+
+              <form onSubmit={handleRecordPayment}>
+                <select
+                  name="invoice_id"
+                  value={paymentForm.invoice_id}
+                  onChange={(e) =>
+                    setPaymentForm({
+                      ...paymentForm,
+                      invoice_id: e.target.value,
+                    })
+                  }
+                  required
+                >
+                  <option value="">Select invoice</option>
+
+                  {invoices
+                    .filter((invoice) => invoice.status !== "Paid")
+                    .map((invoice) => (
+                      <option key={invoice.id} value={invoice.id}>
+                        {invoice.invoice_number ||
+                          `Invoice #${invoice.id}`}{" "}
+                        — {invoice.customer_name || "Customer"} — ₹
+                        {Number(
+                          invoice.total_amount ?? invoice.amount ?? 0
+                        ).toFixed(2)}
+                      </option>
+                    ))}
+                </select>
+
+                <input
+                  type="number"
+                  name="amount"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="Payment amount"
+                  value={paymentForm.amount}
+                  onChange={(e) =>
+                    setPaymentForm({
+                      ...paymentForm,
+                      amount: e.target.value,
+                    })
+                  }
+                  required
+                />
+
+                <select
+                  name="payment_method"
+                  value={paymentForm.payment_method}
+                  onChange={(e) =>
+                    setPaymentForm({
+                      ...paymentForm,
+                      payment_method: e.target.value,
+                    })
+                  }
+                  required
+                >
+                  <option value="UPI">UPI</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Card">Card</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Other">Other</option>
+                </select>
+
+                <textarea
+                  name="notes"
+                  placeholder="Payment notes (optional)"
+                  value={paymentForm.notes}
+                  onChange={(e) =>
+                    setPaymentForm({
+                      ...paymentForm,
+                      notes: e.target.value,
+                    })
+                  }
+                />
+
+                <button type="submit" disabled={paymentLoading}>
+                  {paymentLoading ? "Recording..." : "Record Payment"}
+                </button>
+              </form>
+            </>
+          )}
+
+          {paymentMessage && (
+            <p className="message">{paymentMessage}</p>
+          )}
+
+          <h3>Payments</h3>
+
+          {paymentLoading ? (
+            <p>Loading payments...</p>
+          ) : payments.length === 0 ? (
+            <p>No payments recorded yet.</p>
+          ) : (
+            <div>
+              {payments.map((payment) => (
+                <div
+                  key={payment.id}
+                  style={{
+                    border: "1px solid #ddd",
+                    borderRadius: "8px",
+                    padding: "12px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  <h3>
+                    Payment #{payment.id}
+                  </h3>
+
+                  <p>
+                    Invoice:{" "}
+                    {payment.invoice_number ||
+                      `Invoice #${payment.invoice_id}`}
+                  </p>
+
+                  <p>
+                    Amount: ₹{Number(payment.amount || 0).toFixed(2)}
+                  </p>
+
+                  <p>
+                    Method: {payment.payment_method || "—"}
+                  </p>
+
+                  <p>
+                    Date: {payment.payment_date || "—"}
+                  </p>
+
+                  {payment.notes && (
+                    <p>Notes: {payment.notes}</p>
                   )}
                 </div>
               ))}

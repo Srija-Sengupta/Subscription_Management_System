@@ -67,7 +67,11 @@ router.post(
   authorize("admin", "staff"),
   (req, res) => {
     try {
-      const { subscription_id, due_date, tax_rate = 0 } = req.body;
+      const {
+        subscription_id,
+        due_date,
+        tax_rate = 0
+      } = req.body;
 
       if (!subscription_id) {
         return res.status(400).json({
@@ -79,9 +83,11 @@ router.post(
         SELECT
           subscriptions.id,
           subscriptions.status,
+          subscriptions.plan_id,
           plans.price
         FROM subscriptions
-        JOIN plans ON plans.id = subscriptions.plan_id
+        JOIN plans
+          ON plans.id = subscriptions.plan_id
         WHERE subscriptions.id = ?
       `).get(subscription_id);
 
@@ -106,8 +112,66 @@ router.post(
         });
       }
 
-      const totalAmount = subtotal + subtotal * rate / 100;
+      // Find an active discount for this plan.
+      // A plan-specific discount takes priority over a general discount.
+      const discount = db.prepare(`
+        SELECT
+          id,
+          name,
+          discount_type,
+          discount_value
+        FROM discounts
+        WHERE status = 'active'
+          AND (plan_id = ? OR plan_id IS NULL)
+        ORDER BY
+          CASE
+            WHEN plan_id = ? THEN 0
+            ELSE 1
+          END,
+          id ASC
+        LIMIT 1
+      `).get(
+        subscription.plan_id,
+        subscription.plan_id
+      );
+
+      let discountAmount = 0;
+      let discountNote = "Discount: None";
+
+      if (discount) {
+        const discountValue = Number(discount.discount_value);
+
+        if (discount.discount_type === "percentage") {
+          discountAmount = subtotal * discountValue / 100;
+        } else if (discount.discount_type === "fixed") {
+          discountAmount = discountValue;
+        }
+
+        // A discount cannot reduce the subtotal below zero.
+        discountAmount = Math.min(discountAmount, subtotal);
+
+        discountNote =
+          `Discount: ${discount.name} ` +
+          `(${discount.discount_type}: ${discountValue}), ` +
+          `amount: ${discountAmount.toFixed(2)}`;
+      }
+
+      const discountedSubtotal = subtotal - discountAmount;
+
+      // Tax is calculated after applying the discount.
+      const taxAmount = discountedSubtotal * rate / 100;
+      const totalAmount = Number(
+        (discountedSubtotal + taxAmount).toFixed(2)
+      );
+
       const invoiceNumber = `INV-${Date.now()}-${subscription.id}`;
+
+      const notes = [
+        `Subtotal: ${subtotal.toFixed(2)}`,
+        discountNote,
+        `Tax rate: ${rate}%`,
+        `Tax amount: ${taxAmount.toFixed(2)}`
+      ].join(" | ");
 
       const result = db.prepare(`
         INSERT INTO invoices (
@@ -125,13 +189,17 @@ router.post(
         invoiceNumber,
         due_date || null,
         totalAmount,
-        rate > 0 ? `Tax rate: ${rate}%` : null
+        notes
       );
 
       res.status(201).json({
         message: "Invoice created successfully",
         id: result.lastInsertRowid,
         invoice_number: invoiceNumber,
+        subtotal: Number(subtotal.toFixed(2)),
+        discount_amount: Number(discountAmount.toFixed(2)),
+        tax_rate: rate,
+        tax_amount: Number(taxAmount.toFixed(2)),
         amount: totalAmount
       });
     } catch (error) {

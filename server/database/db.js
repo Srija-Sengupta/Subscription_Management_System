@@ -56,18 +56,28 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    invoice_number TEXT NOT NULL UNIQUE,
     subscription_id INTEGER NOT NULL,
-    customer_id INTEGER NOT NULL,
-    subtotal REAL NOT NULL DEFAULT 0,
-    tax_rate REAL NOT NULL DEFAULT 0,
-    tax_amount REAL NOT NULL DEFAULT 0,
-    total_amount REAL NOT NULL DEFAULT 0,
+    invoice_number TEXT NOT NULL UNIQUE,
+    issue_date TEXT NOT NULL,
     due_date TEXT,
+    amount REAL NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'Draft',
+    notes TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id),
-    FOREIGN KEY (customer_id) REFERENCES users(id)
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS discounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    discount_type TEXT NOT NULL
+      CHECK (discount_type IN ('fixed', 'percentage')),
+    discount_value REAL NOT NULL
+      CHECK (discount_value > 0),
+    plan_id INTEGER,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (plan_id) REFERENCES plans(id)
   );
 `);
 

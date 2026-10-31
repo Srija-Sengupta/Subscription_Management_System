@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import discountRoutes from "./routes/discounts.js";
 
 import authRoutes from "./routes/auth.js";
 import productRoutes from "./routes/products.js";
@@ -18,6 +19,7 @@ app.use("/api/products", productRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/invoices", invoiceRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/discounts", discountRoutes);
 app.get("/", (req, res) => {
   res.json({
     message: "Subscription Management System API is running",
