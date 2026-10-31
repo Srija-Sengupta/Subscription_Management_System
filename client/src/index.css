@@ -1,0 +1,147 @@
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f1f5f9;
+  color: #172033;
+}
+
+.auth-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: white;
+  padding: 35px;
+  border-radius: 14px;
+  box-shadow: 0 10px 40px #00000012;
+}
+
+.brand {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.brand h1 {
+  color: #2563eb;
+  margin-bottom: 5px;
+}
+
+.brand p,
+.subtitle {
+  color: #64748b;
+}
+
+.auth-card h2 {
+  margin-bottom: 5px;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 25px;
+}
+
+input {
+  padding: 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font-size: 15px;
+}
+
+input:focus {
+  outline: 2px solid #93c5fd;
+}
+
+form button,
+.logout {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 13px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+form button:hover {
+  background: #1d4ed8;
+}
+
+.message {
+  color: #2563eb;
+  margin-top: 15px;
+}
+
+.switch {
+  margin-top: 25px;
+  text-align: center;
+  color: #64748b;
+}
+
+.switch button {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.dashboard {
+  min-height: 100vh;
+}
+
+.topbar {
+  background: white;
+  padding: 20px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.topbar h2 {
+  color: #2563eb;
+}
+
+.logout {
+  padding: 10px 20px;
+}
+
+.welcome {
+  padding: 40px;
+}
+
+.role-card {
+  background: white;
+  margin: 0 40px;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px #00000008;
+}
+
+@media (max-width: 600px) {
+  .auth-card {
+    padding: 25px;
+  }
+
+  .topbar,
+  .welcome {
+    padding: 20px;
+  }
+
+  .role-card {
+    margin: 0 20px;
+  }
+}

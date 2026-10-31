@@ -1,0 +1,76 @@
+import Database from "better-sqlite3";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const db = new Database(
+  path.join(__dirname, "subscription.db")
+);
+
+db.pragma("foreign_keys = ON");
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'customer',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    price REAL NOT NULL,
+    status TEXT DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    billing_cycle TEXT NOT NULL,
+    price REAL NOT NULL,
+    status TEXT DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id INTEGER NOT NULL,
+    plan_id INTEGER NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT,
+    status TEXT NOT NULL DEFAULT 'Draft',
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (customer_id) REFERENCES users(id),
+    FOREIGN KEY (plan_id) REFERENCES plans(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_number TEXT NOT NULL UNIQUE,
+    subscription_id INTEGER NOT NULL,
+    customer_id INTEGER NOT NULL,
+    subtotal REAL NOT NULL DEFAULT 0,
+    tax_rate REAL NOT NULL DEFAULT 0,
+    tax_amount REAL NOT NULL DEFAULT 0,
+    total_amount REAL NOT NULL DEFAULT 0,
+    due_date TEXT,
+    status TEXT NOT NULL DEFAULT 'Draft',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id),
+    FOREIGN KEY (customer_id) REFERENCES users(id)
+  );
+`);
+
+console.log("SQLite database connected");
+
+export default db;
